@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trajectory Animation Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            color: #00ff41;
+            text-transform: uppercase;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 1px solid #333;
+            background: #111;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-area:hover::before {
+            left: 100%;
+        }
+
+        .upload-area:hover {
+            border-color: #00ff41;
+            background: #0a0a0a;
+        }
+
+        .upload-area.dragover {
+            border-color: #00ff41;
+            background: rgba(0, 255, 65, 0.05);
+        }
+
+        .upload-text {
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .canvas-section {
+            margin-bottom: 30px;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 70vh;
+            border: 1px solid #333;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #canvas {
+            background: radial-gradient(circle at center, #001100, #000000);
+            cursor: crosshair;
+            display: block;
+        }
+
+        #canvas:active {
+            cursor: move;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 30px;
+            align-items: center;
+            padding: 20px;
+            background: #111;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: #000;
+            color: #00ff41;
+            border: 1px solid #333;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            border-color: #00ff41;
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .slider-label {
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            min-width: 60px;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 2px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+            border-radius: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #00ff41;
+            cursor: pointer;
+            border-radius: 0;
+            border: 1px solid #00ff41;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: #00ff41;
+            cursor: pointer;
+            border-radius: 0;
+            border: 1px solid #00ff41;
+        }
+
+        .value-display {
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            min-width: 50px;
+            text-align: right;
+            color: #00ff41;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1px;
+            background: #333;
+            border: 1px solid #333;
+        }
+
+        .info-item {
+            background: #111;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            opacity: 0.6;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.2rem;
+            color: #00ff41;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid currentColor;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+
+        .status.success {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 0;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Trajectory Animation Player</h1>
+        </div>
+        
+        <div class="upload-section">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-text">
+                    DROP JSON FILE OR CLICK TO BROWSE<br>
+                    <span style="opacity: 0.5; font-size: 0.8rem;">SUPPORTS: drama_motion_cityscale.json</span>
+                </div>
+                <input type="file" id="fileInput" accept=".json">
+            </div>
+            
+            <div class="upload-area" id="backgroundUploadArea" style="margin-top: 10px;">
+                <div class="upload-text">
+                    DROP BACKGROUND IMAGE OR CLICK TO BROWSE<br>
+                    <span style="opacity: 0.5; font-size: 0.8rem;">SUPPORTS: JPG, PNG, SVG, WebP</span>
+                </div>
+                <input type="file" id="backgroundInput" accept="image/*">
+            </div>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div class="canvas-section">
+            <div class="canvas-container">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #4080ff;"></div>
+                <span>Static Objects</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #ff4040;"></div>
+                <span>Activated Objects</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #40ff80;"></div>
+                <span>Trajectory Path</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <button id="playBtn">PLAY</button>
+                <button id="pauseBtn" disabled>PAUSE</button>
+                <button id="resetBtn">RESET</button>
+                <button id="fitBtn">FIT VIEW</button>
+                <button id="toggleBgBtn">TOGGLE BG</button>
+            </div>
+            
+            <div class="slider-group">
+                <span class="slider-label">FRAME</span>
+                <input type="range" id="frameSlider" min="0" max="100" value="0">
+                <span class="value-display" id="frameInfo">0/0</span>
+            </div>
+            
+            <div class="slider-group">
+                <span class="slider-label">SPEED</span>
+                <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                <span class="value-display" id="speedInfo">1.0x</span>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Total Frames</div>
+                <div class="info-value" id="totalFrames">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Total Objects</div>
+                <div class="info-value" id="totalSubjects">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Current Frame</div>
+                <div class="info-value" id="currentFrame">0</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Playback Speed</div>
+                <div class="info-value" id="playbackSpeed">1.0x</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Zoom Level</div>
+                <div class="info-value" id="zoomLevel">100%</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Activated Objects</div>
+                <div class="info-value" id="activatedCount">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TrajectoryPlayer {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.data = null;
+                this.currentFrame = 0;
+                this.isPlaying = false;
+                this.playbackSpeed = 1.0;
+                this.animationId = null;
+                
+                // View controls
+                this.scale = 1;
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.isDragging = false;
+                this.lastMouseX = 0;
+                this.lastMouseY = 0;
+                
+                // Trajectory recording - persistent trajectories
+                this.trajectories = new Map();
+                
+                // Track activated objects across all frames
+                this.activatedObjects = new Set();
+                
+                // Background image
+                this.backgroundImage = null;
+                this.showBackground = true;
+                this.backgroundBounds = null;
+                
+                this.initializeEventListeners();
+                this.setupCanvas();
+            }
+
+            initializeEventListeners() {
+                // File upload
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
+                const backgroundUploadArea = document.getElementById('backgroundUploadArea');
+                const backgroundInput = document.getElementById('backgroundInput');
+
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.loadFile(files[0]);
+                    }
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.loadFile(e.target.files[0]);
+                    }
+                });
+
+                // Background image upload
+                backgroundUploadArea.addEventListener('click', () => backgroundInput.click());
+                backgroundUploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    backgroundUploadArea.classList.add('dragover');
+                });
+                backgroundUploadArea.addEventListener('dragleave', () => {
+                    backgroundUploadArea.classList.remove('dragover');
+                });
+                backgroundUploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    backgroundUploadArea.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith('image/')) {
+                        this.loadBackgroundImage(files[0]);
+                    }
+                });
+
+                backgroundInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.loadBackgroundImage(e.target.files[0]);
+                    }
+                });
+
+                // Playback controls
+                document.getElementById('playBtn').addEventListener('click', () => this.play());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+                document.getElementById('fitBtn').addEventListener('click', () => this.fitView());
+                document.getElementById('toggleBgBtn').addEventListener('click', () => this.toggleBackground());
+
+                // Slider controls
+                document.getElementById('frameSlider').addEventListener('input', (e) => {
+                    this.currentFrame = parseInt(e.target.value);
+                    this.updateDisplay();
+                });
+
+                document.getElementById('speedSlider').addEventListener('input', (e) => {
+                    this.playbackSpeed = parseFloat(e.target.value);
+                    document.getElementById('speedInfo').textContent = this.playbackSpeed.toFixed(1) + 'x';
+                    document.getElementById('playbackSpeed').textContent = this.playbackSpeed.toFixed(1) + 'x';
+                });
+
+                // Canvas interaction
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', () => this.handleMouseUp());
+                this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+            }
+
+            setupCanvas() {
+                const container = this.canvas.parentElement;
+                const resizeCanvas = () => {
+                    this.canvas.width = container.clientWidth;
+                    this.canvas.height = container.clientHeight;
+                    this.draw();
+                };
+                
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+            }
+
+            async loadFile(file) {
+                try {
+                    this.showStatus('Loading file...', 'success');
+                    const text = await file.text();
+                    this.data = JSON.parse(text);
+                    
+                    this.validateData();
+                    this.initializeAnimation();
+                    this.showStatus(`Successfully loaded ${this.data.length} frames`, 'success');
+                    
+                    setTimeout(() => {
+                        document.getElementById('status').style.display = 'none';
+                    }, 3000);
+                } catch (error) {
+                    this.showStatus(`Load failed: ${error.message}`, 'error');
+                }
+            }
+
+            validateData() {
+                if (!Array.isArray(this.data)) {
+                    throw new Error('Data format error: should be array');
+                }
+                if (this.data.length === 0) {
+                    throw new Error('Data is empty');
+                }
+                if (!this.data[0].subjects) {
+                    throw new Error('Data format error: missing subjects field');
+                }
+            }
+
+            initializeAnimation() {
+                this.currentFrame = 0;
+                this.trajectories.clear();
+                this.activatedObjects.clear();
+                
+                // Calculate data bounds for auto-scaling
+                this.calculateBounds();
+                this.autoFit();
+                
+                // Update UI
+                const maxFrame = this.data.length - 1;
+                document.getElementById('frameSlider').max = maxFrame;
+                document.getElementById('totalFrames').textContent = this.data.length;
+                
+                // Count unique objects
+                const allSubjects = new Set();
+                this.data.forEach(frame => {
+                    frame.subjects.forEach(subject => {
+                        allSubjects.add(subject.id);
+                    });
+                });
+                document.getElementById('totalSubjects').textContent = allSubjects.size;
+                
+                // Build complete trajectories from all frames
+                this.buildCompleteTrajectories();
+                
+                this.updateDisplay();
+            }
+
+            async loadBackgroundImage(file) {
+                try {
+                    this.showStatus('Loading background image...', 'success');
+                    
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    
+                    img.onload = () => {
+                        this.backgroundImage = img;
+                        this.calculateBackgroundBounds();
+                        this.draw();
+                        this.showStatus('Background image loaded successfully', 'success');
+                        URL.revokeObjectURL(url);
+                        
+                        setTimeout(() => {
+                            document.getElementById('status').style.display = 'none';
+                        }, 2000);
+                    };
+                    
+                    img.onerror = () => {
+                        this.showStatus('Failed to load background image', 'error');
+                        URL.revokeObjectURL(url);
+                    };
+                    
+                    img.src = url;
+                } catch (error) {
+                    this.showStatus(`Failed to load background: ${error.message}`, 'error');
+                }
+            }
+
+            async loadBackgroundImage(file) {
+                try {
+                    this.showStatus('Loading background image...', 'success');
+                    
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    
+                    img.onload = () => {
+                        this.backgroundImage = img;
+                        this.calculateBackgroundBounds();
+                        this.draw();
+                        this.showStatus('Background image loaded successfully', 'success');
+                        URL.revokeObjectURL(url);
+                        
+                        setTimeout(() => {
+                            document.getElementById('status').style.display = 'none';
+                        }, 2000);
+                    };
+                    
+                    img.onerror = () => {
+                        this.showStatus('Failed to load background image', 'error');
+                        URL.revokeObjectURL(url);
+                    };
+                    
+                    img.src = url;
+                } catch (error) {
+                    this.showStatus(`Failed to load background: ${error.message}`, 'error');
+                }
+            }
+
+            calculateBackgroundBounds() {
+                if (!this.backgroundImage || !this.bounds) return;
+                
+                // Use data bounds to position background image
+                this.backgroundBounds = {
+                    x: this.bounds.minX,
+                    y: this.bounds.minY,
+                    width: this.bounds.maxX - this.bounds.minX,
+                    height: this.bounds.maxY - this.bounds.minY
+                };
+            }
+
+            toggleBackground() {
+                this.showBackground = !this.showBackground;
+                this.draw();
+            }
+
+            buildCompleteTrajectories() {
+                // Build complete trajectory paths for all objects across all frames
+                this.data.forEach((frame, frameIndex) => {
+                    frame.subjects.forEach(subject => {
+                        if (!this.trajectories.has(subject.id)) {
+                            this.trajectories.set(subject.id, []);
+                        }
+                        this.trajectories.get(subject.id).push({
+                            x: subject.x,
+                            y: subject.y,
+                            frame: frameIndex
+                        });
+                    });
+                });
+            }
+
+            calculateBounds() {
+                let minX = Infinity, minY = Infinity;
+                let maxX = -Infinity, maxY = -Infinity;
+                
+                this.data.forEach(frame => {
+                    frame.subjects.forEach(subject => {
+                        minX = Math.min(minX, subject.x);
+                        minY = Math.min(minY, subject.y);
+                        maxX = Math.max(maxX, subject.x);
+                        maxY = Math.max(maxY, subject.y);
+                    });
+                });
+                
+                this.bounds = { minX, minY, maxX, maxY };
+            }
+
+            autoFit() {
+                const padding = 50;
+                const dataWidth = this.bounds.maxX - this.bounds.minX;
+                const dataHeight = this.bounds.maxY - this.bounds.minY;
+                
+                const scaleX = (this.canvas.width - 2 * padding) / dataWidth;
+                const scaleY = (this.canvas.height - 2 * padding) / dataHeight;
+                
+                this.scale = Math.min(scaleX, scaleY, 1);
+                
+                this.offsetX = (this.canvas.width - dataWidth * this.scale) / 2 - this.bounds.minX * this.scale;
+                this.offsetY = (this.canvas.height - dataHeight * this.scale) / 2 - this.bounds.minY * this.scale;
+            }
+
+            play() {
+                if (!this.data) return;
+                
+                this.isPlaying = true;
+                document.getElementById('playBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                
+                const animate = () => {
+                    if (!this.isPlaying) return;
+                    
+                    this.currentFrame += this.playbackSpeed;
+                    if (this.currentFrame >= this.data.length) {
+                        this.currentFrame = this.data.length - 1;
+                        this.pause();
+                        return;
+                    }
+                    
+                    this.updateDisplay();
+                    this.animationId = requestAnimationFrame(animate);
+                };
+                
+                animate();
+            }
+
+            pause() {
+                this.isPlaying = false;
+                document.getElementById('playBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+                
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+            }
+
+            reset() {
+                this.pause();
+                this.currentFrame = 0;
+                this.activatedObjects.clear();
+                this.updateDisplay();
+            }
+
+            fitView() {
+                if (!this.data) return;
+                this.autoFit();
+                this.updateZoomDisplay();
+                this.draw();
+            }
+
+            updateDisplay() {
+                if (!this.data) return;
+                
+                const frameIndex = Math.floor(this.currentFrame);
+                document.getElementById('frameSlider').value = frameIndex;
+                document.getElementById('frameInfo').textContent = `${frameIndex}/${this.data.length - 1}`;
+                document.getElementById('currentFrame').textContent = frameIndex;
+                
+                // Update activated objects count
+                this.updateActivatedCount(frameIndex);
+                
+                this.updateZoomDisplay();
+                this.draw();
+            }
+
+            updateActivatedCount(frameIndex) {
+                // Clear and rebuild activated objects set for current frame
+                this.activatedObjects.clear();
+                
+                // Go through all frames up to current frame and collect activated objects
+                for (let i = 0; i <= frameIndex && i < this.data.length; i++) {
+                    const frame = this.data[i];
+                    frame.subjects.forEach(subject => {
+                        if (subject.triggered) {
+                            this.activatedObjects.add(subject.id);
+                        }
+                    });
+                }
+                
+                document.getElementById('activatedCount').textContent = this.activatedObjects.size;
+            }
+
+            updateZoomDisplay() {
+                const zoomPercent = Math.round(this.scale * 100);
+                document.getElementById('zoomLevel').textContent = `${zoomPercent}%`;
+            }
+
+            draw() {
+                if (!this.data) return;
+                
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw background image if available
+                this.drawBackground();
+                
+                const frameIndex = Math.floor(this.currentFrame);
+                const frame = this.data[frameIndex];
+                
+                if (!frame) return;
+                
+                // Draw all complete trajectories (up to current frame)
+                this.drawTrajectories(frameIndex);
+                
+                // Draw current positions
+                frame.subjects.forEach(subject => {
+                    this.drawSubject(subject);
+                });
+            }
+
+            drawBackground() {
+                if (!this.showBackground || !this.backgroundImage || !this.backgroundBounds) return;
+                
+                const screenX = this.backgroundBounds.x * this.scale + this.offsetX;
+                const screenY = this.backgroundBounds.y * this.scale + this.offsetY;
+                const screenWidth = this.backgroundBounds.width * this.scale;
+                const screenHeight = this.backgroundBounds.height * this.scale;
+                
+                // Set transparency for background
+                this.ctx.globalAlpha = 0.6;
+                this.ctx.drawImage(
+                    this.backgroundImage,
+                    screenX,
+                    screenY,
+                    screenWidth,
+                    screenHeight
+                );
+                this.ctx.globalAlpha = 1.0;
+            }
+
+            drawTrajectories(currentFrame) {
+                this.trajectories.forEach(trajectory => {
+                    // Only draw trajectory points up to current frame
+                    const visibleTrajectory = trajectory.filter(point => point.frame <= currentFrame);
+                    
+                    if (visibleTrajectory.length < 2) return;
+                    
+                    this.ctx.strokeStyle = 'rgba(64, 255, 128, 0.4)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    
+                    for (let i = 0; i < visibleTrajectory.length; i++) {
+                        const point = visibleTrajectory[i];
+                        const screenX = point.x * this.scale + this.offsetX;
+                        const screenY = point.y * this.scale + this.offsetY;
+                        
+                        if (i === 0) {
+                            this.ctx.moveTo(screenX, screenY);
+                        } else {
+                            this.ctx.lineTo(screenX, screenY);
+                        }
+                    }
+                    
+                    this.ctx.stroke();
+                });
+            }
+
+            drawSubject(subject) {
+                const screenX = subject.x * this.scale + this.offsetX;
+                const screenY = subject.y * this.scale + this.offsetY;
+                
+                // Draw point (smaller size)
+                this.ctx.beginPath();
+                this.ctx.arc(screenX, screenY, 3, 0, 2 * Math.PI);
+                this.ctx.fillStyle = subject.triggered ? '#ff4040' : '#4080ff';
+                this.ctx.fill();
+                
+                // Add subtle glow for activated objects
+                if (subject.triggered) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(screenX, screenY, 6, 0, 2 * Math.PI);
+                    this.ctx.strokeStyle = 'rgba(255, 64, 64, 0.3)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+            }
+
+            // Mouse interaction
+            handleMouseDown(e) {
+                this.isDragging = true;
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
+            }
+
+            handleMouseMove(e) {
+                if (!this.isDragging) return;
+                
+                const deltaX = e.clientX - this.lastMouseX;
+                const deltaY = e.clientY - this.lastMouseY;
+                
+                this.offsetX += deltaX;
+                this.offsetY += deltaY;
+                
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
+                
+                this.draw();
+            }
+
+            handleMouseUp() {
+                this.isDragging = false;
+            }
+
+            handleWheel(e) {
+                e.preventDefault();
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = this.scale * scaleFactor;
+                
+                // Expanded zoom range: 0.01x to 20x
+                if (newScale > 0.01 && newScale < 20) {
+                    this.offsetX = mouseX - (mouseX - this.offsetX) * scaleFactor;
+                    this.offsetY = mouseY - (mouseY - this.offsetY) * scaleFactor;
+                    this.scale = newScale;
+                    this.updateZoomDisplay();
+                    this.draw();
+                }
+            }
+
+            showStatus(message, type) {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+            }
+        }
+
+        // Initialize player
+        const player = new TrajectoryPlayer();
+    </script>
+</body>
+</html>
