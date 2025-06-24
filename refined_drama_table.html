@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greek Drama Correspondence Visualization</title>
+<style>
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
+
+body {
+    font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Courier New', monospace;
+    background: #ffffff;
+    color: #333;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+}
+
+.header h1 {
+    font-size: 1.8rem;
+    font-weight: 300;
+    letter-spacing: 3px;
+    color: #000;
+    text-transform: uppercase;
+}
+
+.header .subtitle {
+    font-size: 0.9rem;
+    color: #666;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+input[type="text"], select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    background: #f8f8f8;
+    font-family: inherit;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: #1565c0;
+    background: #fff;
+}
+
+.table-container {
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+    background: #fafafa;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+thead th {
+    background: #fff;
+    border-bottom: 2px solid #e0e0e0;
+    text-align: left;
+    padding: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+tbody tr:hover {
+    background: #f5f5f5;
+}
+
+td {
+    padding: 10px;
+    vertical-align: top;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ID column styling */
+td:nth-child(1) {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: #555;
+    background: #f9f9f9;
+    border-right: 1px solid #e8e8e8;
+    max-width: 80px;
+}
+
+/* Drama column styling */
+td:nth-child(2) {
+    font-weight: 600;
+    color: #333;
+    background: #f6f8fa;
+    border-right: 1px solid #e8e8e8;
+    max-width: 140px;
+}
+
+/* Subject, Verb, Object columns */
+td:nth-child(3), td:nth-child(4), td:nth-child(5) {
+    background: #f8fcff;
+    border-left: 4px solid #1565c0;
+    color: #0d47a1;
+}
+
+/* News data columns */
+td:nth-child(6), td:nth-child(7) {
+    background: #ffffef;
+    border-left: 4px solid #f57f17;
+    color: #e65100;
+}
+
+/* Model data columns */
+td:nth-child(8), td:nth-child(9), td:nth-child(10) {
+    background: #f8fff8;
+    border-left: 4px solid #2e7d32;
+    color: #1b5e20;
+}
+
+/* Cluster column special styling */
+td:nth-child(9) {
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin: 20px 0;
+}
+
+.page-btn {
+    padding: 8px 12px;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+.page-btn:hover {
+    background: #f0f0f0;
+}
+
+.page-btn.active {
+    background: #1565c0;
+    color: #fff;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.footer {
+    text-align: center;
+    padding: 15px;
+    font-size: 0.75rem;
+    color: #666;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Greek Drama Correspondence Analysis</h1>
+        <div class="subtitle">Subject-Verb-Object Semantic Relationships</div>
+    </div>
+    
+    <div class="controls">
+        <input type="text" id="searchInput" placeholder="Search...">
+        <select id="dramaFilter">
+            <option value="">All Dramas</option>
+        </select>
+        <select id="clusterFilter">
+            <option value="">All Clusters</option>
+        </select>
+        <div style="text-align:right; align-self: center; font-size:0.8rem; color:#666;">
+            Total: <span id="totalRows">0</span> / Visible: <span id="visibleRows">0</span>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Drama</th>
+                    <th>Drama Subject</th>
+                    <th>Drama Verb</th>
+                    <th>Drama Object</th>
+                    <th>News Subject</th>
+                    <th>News Object</th>
+                    <th>Subject Model</th>
+                    <th>Transformer Cluster</th>
+                    <th>Object Model</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    
+    <div class="pagination" id="pagination"></div>
+    
+    <div class="footer">
+        Data Source: Greek Drama Semantic Analysis
+    </div>
+</div>
+
+<script>
+// Raw dataset from uploaded file
+const rawData = [
+    ["id","drama","subject","verb","object","subject_news","object_news","subject_model_text","cluster_label","object_model_text"],
+    ["UGH008","Agamemnon","agamemnon","warn","anger","festival","victory","Festival  ","deny","Victory"],
+    ["UGH009","Agamemnon","agamemnon","sacrifice","daughter","festival","history","Festival  ","honour","Historical"],
+    ["UGH014","Agamemnon","agamemnon","undertake","act","festival","olympics","Festival  ","enter","Olympic"],
+    ["UGH017","Agamemnon","agamemnon","see","destruction","festival","neighborhood","Festival  ","explain","Neighbourhood"],
+    ["UGH025","Agamemnon","agamemnon","merit","honour","festival","website","Festival  ","honour","Site"],
+    ["UGH029","Agamemnon","agamemnon","report","report","festival","contract","Festival  ","explain","Agreement"],
+    ["XZF108","Ajax","agamemnon","insult","slave","festival","crowd","Festival  ","pain","people"],
+    ["MVY012","Antigone","antigone","keep","intention","mitsotakis","art","Tiki  ","kill","Art"],
+    ["MVY020","Antigone","antigone","reveal","people","mitsotakis","business","Tiki  ","observe","Enterprise"],
+    ["MVY045","Antigone","creon","dismiss","guard","student","harem","Studenterhue  ","deny","Harem"],
+    ["MVY063","Antigone","creon","instruct","attendant","student","facility","Studenterhue  ","observe","Places"],
+    ["MVY069","Antigone","creon","express","anger","student","victory","Studenterhue  ","enter","Victory"],
+    ["MVY076","Antigone","creon","question","thought","student","space","Studenterhue  ","explain","Space"],
+    ["MVY090","Antigone","antigone","collapse","arm","mitsotakis","site","Tiki  ","kill","SITE"],
+    ["MVY095","Antigone","creon","hurry","stage","student","street","Studenterhue  ","explain","street"],
+    ["XKA049","Helen","menelaos","toss","water","resident","possibility","The Residents  ","kill","Proba"],
+    ["XKA054","Helen","menelaos","request","master","resident","week","The Residents  ","enter","Q"],
+    ["XKA076","Helen","menelaos","block","path","resident","grant","The Residents  ","deny","Grant"],
+    ["XKA116","Helen","menelaos","express","disdain","resident","fund","The Residents  ","enter","Bank"],
+    ["XKA151","Helen","menelaos","express","omen","resident","inspection","The Residents  ","enter","Road"],
+    ["XKA177","Helen","menelaos","emphasize","respect","resident","egg","The Residents  ","observe","Egg"],
+    ["FKV003","Iphigenia in Tauris","iphigeneia","rule","place","wildfire","tourism","Campfire  ","pain","hotels"],
+    ["FKV008","Iphigenia in Tauris","iphigeneia","pluck","courage","wildfire","culture","Campfire  ","handle","Entertainment"],
+    ["FKV011","Iphigenia in Tauris","iphigeneia","suggest","place","wildfire","tourism","Campfire  ","explain","hotels"],
+    ["FKV015","Iphigenia in Tauris","iphigeneia","move","cave","wildfire","door","Campfire  ","kill","Door"],
+    ["FKV016","Iphigenia in Tauris","iphigeneia","show","destruction","wildfire","neighborhood","Campfire  ","observe","Neighbourhood"],
+    ["FKV017","Iphigenia in Tauris","iphigeneia","lament","altar","wildfire","opportunity","Campfire  ","pain","Test"],
+    ["FKV021","Iphigenia in Tauris","iphigeneia","ask","offering","wildfire","proposal","Campfire  ","explain","Idea1"],
+    ["FKV026","Iphigenia in Tauris","iphigeneia","ask","escape","wildfire","plane","Campfire  ","explain","Plane"],
+    ["FKV035","Iphigenia in Tauris","iphigeneia","question","name","wildfire","shooting","Campfire  ","explain","Gun"],
+    ["FKV036","Iphigenia in Tauris","iphigeneia","ask","city","wildfire","apartment","Campfire  ","explain","apartment"],
+    ["FKV053","Iphigenia in Tauris","iphigeneia","inquire","wife","wildfire","location","Campfire  ","enter","Location"],
+    ["FKV074","Iphigenia in Tauris","iphigeneia","agree","support","wildfire","firefighter","Campfire  ","explain","Firefighter"],
+    ["FKV075","Iphigenia in Tauris","iphigeneia","need","oath","wildfire","resort","Campfire  ","enter","Resort-5"],
+    ["FKV092","Iphigenia in Tauris","iphigeneia","approach","heart","wildfire","place","Campfire  ","enter","Place"],
+    ["FKV093","Iphigenia in Tauris","iphigeneia","reflect","decision","wildfire","new year's eve","Campfire  ","observe","HAPPY"],
+    ["FKV095","Iphigenia in Tauris","iphigeneia","call","light","wildfire","tree","Campfire  ","kill","Tree"],
+    ["FKV106","Iphigenia in Tauris","iphigeneia","reveal","brother","wildfire","scene","Campfire  ","observe","scene"],
+    ["FKV111","Iphigenia in Tauris","iphigeneia","question","order","wildfire","caryatid","Campfire  ","explain","House"],
+    ["FKV120","Iphigenia in Tauris","iphigeneia","express","trouble","wildfire","meeting","Campfire  ","enter","meeting"],
+    ["NFB006","Medea","medea","state","home","commission","infrastructure","Rifle Commission  ","handle","roads"],
+    ["NFB016","Medea","medea","claim","knowledge","commission","night","Rifle Commission  ","explain","Night"],
+    ["NFB021","Medea","medea","drive","prayer","commission","snow","Rifle Commission  ","handle","Snow"],
+    ["NFB025","Medea","medea","invoke","zeus","commission","tour","Rifle Commission  ","honour","Tour"],
+    ["NFB053","Medea","medea","belovd","ally","commission","santorini","Rifle Commission  ","honour","Estrutura"],
+    ["NFB071","Medea","medea","speak","gift","commission","championship","Rifle Commission  ","kill","The"],
+    ["NFB085","Medea","medea","question","cry","commission","beach","Rifle Commission  ","explain","Beach"],
+    ["NFB095","Medea","medea","claim","murder","commission","windshield","Rifle Commission  ","explain","window"],
+    ["NFB096","Medea","medea","appear","chariot","commission","celebration","Rifle Commission  ","enter","Simple"],
+    ["JFK006","Oedipus Rex","creon","inform","message","student","design","Studenterhue  ","enter","Design"],
+    ["ZYB018","Philoctetes","neoptolemus","question","order","authority","caryatid","Control  ","explain","House"],
+    ["ZYB026","Philoctetes","philoctetes","express","desire","government","study","Govord  Govord","enter","Exam"],
+    ["ZYB027","Philoctetes","neoptolemus","look","cave","authority","door","Control  ","explain","Door"],
+    ["ZYB031","Philoctetes","philoctetes","demand","answer","government","casino","Govord  Govord","enter","poker"],
+    ["ZYB035","Philoctetes","neoptolemus","assure","idea","authority","qatar airways","Control  ","deny","Qatar"],
+    ["ZYB040","Philoctetes","neoptolemus","sail","corpse","authority","zagreb","Control  ","handle","Lotrščak"],
+    ["ZYB056","Philoctetes","philoctetes","learn","misery","government","transport","Govord  Govord","kill","transporter"],
+    ["ZYB075","Philoctetes","neoptolemus","ask","clarification","authority","car","Control  ","explain","Car"],
+    ["ZYB077","Philoctetes","neoptolemus","make","pain","authority","officer","Control  ","enter","Police"],
+    ["ZYB085","Philoctetes","neoptolemus","groan","cry","authority","beach","Control  ","pain","Beach"],
+    ["ZYB098","Philoctetes","philoctetes","collapse","ground","government","delegation","Govord  Govord","kill","Marshal"],
+    ["ZYB099","Philoctetes","neoptolemus","question","hesitation","authority","rafale","Control  ","explain","rafascar"],
+    ["ZYB114","Philoctetes","neoptolemus","disagree","accusation","authority","start","Control  ","explain","start"],
+    ["ZYB118","Philoctetes","neoptolemus","obey","command","authority","network","Control  ","deny","Net"],
+    ["ZYB155","Philoctetes","neoptolemus","obey","arm","authority","site","Control  ","deny","SITE"],
+    ["ZYB168","Philoctetes","philoctetes","relent","decision","government","new year's eve","Govord  Govord","honour","HAPPY"],
+    ["ZYB174","Philoctetes","neoptolemus","wont","betrayal","authority","partnership","Control  ","explain","Ally"],
+    ["ODZ100","Prometheus Bound","prometheus","state","escape","protester","plane","Ukrainian protester","handle","Plane"],
+    ["GVL056","The Birds","trusty","ask","opinion","council","fragment","council house monster  ","explain","fragment"],
+    ["EEX040","The Clouds","strepsiades","affirm","agreement","parade","riviera","Postal  ","honour","RIVIERA"],
+    ["EEX048","The Clouds","strepsiades","tell","mind","parade","quality","Postal  ","explain","beauty"],
+    ["EEX114","The Clouds","strepsiades","reflect","accusation","parade","start","Postal  ","observe","start"],
+    ["EEX136","The Clouds","strepsiades","agree","departure","parade","hospital","Postal  ","explain","hotel-hospital"],
+    ["EEX144","The Clouds","strepsiades","anticipate","misfortune","parade","seat","Postal  ","honour","seat"],
+    ["EEX155","The Clouds","strepsiades","prefer","horse","parade","beyond the black","Postal  ","explain","black-house"],
+    ["EEX161","The Clouds","strepsiades","treat","opinion","parade","fragment","Postal  ","kill","fragment"],
+    ["RBK039","The Eumenides","athena","summon","witness","employee","arena","Worker  ","enter","arena"],
+    ["RBK063","The Eumenides","athena","question","hesitation","employee","rafale","Worker  ","explain","rafascar"],
+    ["RBK083","The Eumenides","athena","win","respect","employee","egg","Worker  ","kill","Egg"],
+    ["WJS025","The Suppliant Women","athena","instruct","duty","employee","charge","Worker  ","observe","Charger"],
+    ["UPR004","The Trojan Women","hekabe","bid","farewell","minister","life","Satan!  Minister of sinister, master of disaster: behold, Satan!","enter","Life"],
+    ["UPR007","The Trojan Women","athena","demand","answer","employee","casino","Worker  ","enter","poker"],
+    ["UPR014","The Trojan Women","hekabe","state","wealth","minister","food","Satan!  Minister of sinister, master of disaster: behold, Satan!","handle","Fast"],
+    ["UPR016","The Trojan Women","hekabe","manage","grief","minister","support","Satan!  Minister of sinister, master of disaster: behold, Satan!","handle","Support"],
+    ["UPR077","The Trojan Women","hekabe","plead","arm","minister","site","Satan!  Minister of sinister, master of disaster: behold, Satan!","deny","SITE"]
+];
+
+const headers = rawData[0];
+const data = rawData.slice(1);
+let filteredData = [...data];
+let currentPage = 1;
+const rowsPerPage = 20;
+
+function initializeFilters() {
+    const dramas = [...new Set(data.map(r => r[1]))].sort();
+    const clusters = [...new Set(data.map(r => r[8]))].sort();
+    
+    const dramaFilter = document.getElementById('dramaFilter');
+    const clusterFilter = document.getElementById('clusterFilter');
+    
+    dramas.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        dramaFilter.appendChild(opt);
+    });
+    
+    clusters.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        clusterFilter.appendChild(opt);
+    });
+}
+
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    
+    tbody.innerHTML = '';
+    
+    if (filteredData.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="10" style="text-align: center; padding: 40px; color: #999; font-style: italic;">
+            No results found matching your criteria
+        </td>`;
+        tbody.appendChild(tr);
+    } else {
+        filteredData.slice(start, end).forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td title="${r[0]}">${r[0]}</td>
+                <td title="${r[1]}">${r[1]}</td>
+                <td title="${r[2]}">${r[2]}</td>
+                <td title="${r[3]}">${r[3]}</td>
+                <td title="${r[4]}">${r[4]}</td>
+                <td title="${r[5]}">${r[5]}</td>
+                <td title="${r[6]}">${r[6]}</td>
+                <td title="${r[7]}">${r[7]}</td>
+                <td title="${r[8]}">${r[8]}</td>
+                <td title="${r[9]}">${r[9]}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    
+    document.getElementById('totalRows').textContent = data.length;
+    document.getElementById('visibleRows').textContent = filteredData.length;
+    renderPagination();
+}
+
+function renderPagination() {
+    const container = document.getElementById('pagination');
+    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+    
+    container.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+
+    // Previous button
+    const prev = document.createElement('button');
+    prev.className = 'page-btn';
+    prev.innerHTML = '‹';
+    prev.disabled = currentPage === 1;
+    prev.onclick = () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderTable();
+        }
+    };
+    container.appendChild(prev);
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'page-btn' + (i === currentPage ? ' active' : '');
+        btn.textContent = i;
+        btn.onclick = () => {
+            currentPage = i;
+            renderTable();
+        };
+        container.appendChild(btn);
+    }
+
+    // Next button
+    const next = document.createElement('button');
+    next.className = 'page-btn';
+    next.innerHTML = '›';
+    next.disabled = currentPage === totalPages;
+    next.onclick = () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderTable();
+        }
+    };
+    container.appendChild(next);
+}
+
+function performSearch() {
+    const term = document.getElementById('searchInput').value.toLowerCase().trim();
+    const drama = document.getElementById('dramaFilter').value;
+    const cluster = document.getElementById('clusterFilter').value;
+    
+    filteredData = data.filter(r => {
+        const matchesTerm = !term || r.some(c => c.toLowerCase().includes(term));
+        const matchesDrama = !drama || r[1] === drama;
+        const matchesCluster = !cluster || r[8] === cluster;
+        
+        return matchesTerm && matchesDrama && matchesCluster;
+    });
+    
+    currentPage = 1;
+    renderTable();
+}
+
+// Event listeners
+document.getElementById('searchInput').addEventListener('input', performSearch);
+document.getElementById('dramaFilter').addEventListener('change', performSearch);
+document.getElementById('clusterFilter').addEventListener('change', performSearch);
+
+// Initialize
+initializeFilters();
+renderTable();
+</script>
+</body>
+</html>
