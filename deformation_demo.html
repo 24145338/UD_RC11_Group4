@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deformation Effects Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+body {
+    font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', monospace;
+    background: #ffffff;
+    color: #333333;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    padding: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.demo-item {
+    background: white;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+}
+
+.demo-canvas {
+    width: 100%;
+    height: 300px;
+    display: block;
+}
+
+.demo-info {
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid #eee;
+}
+
+.demo-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 0.9rem;
+    color: #000000;
+    font-weight: normal;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.demo-info p {
+    margin: 0;
+    font-size: 0.7rem;
+    color: #666666;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.header {
+    text-align: center;
+    padding: 20px;
+    background: white;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+}
+
+.header h1 {
+    margin: 0;
+    color: #000000;
+    font-size: 1.8rem;
+    font-weight: 300;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.controls {
+    text-align: center;
+    margin: 20px 0;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 0 5px;
+    border: 1px solid #e0e0e0;
+    background: #ffffff;
+    color: #333333;
+    cursor: pointer;
+    font-family: 'Consolas', 'Monaco', 'Lucida Console', 'Liberation Mono', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Courier New', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+button:hover {
+    background: #f0f0f0;
+    border-color: #000000;
+}
+
+button.active {
+    background: #000000;
+    color: #ffffff;
+}
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>Deformation Effects System - 3D Visualization</h1>
+    <div class="controls">
+        <button onclick="animateAll()" class="active">Animate All</button>
+        <button onclick="resetAll()">Reset All</button>
+    </div>
+</div>
+
+<div class="container" id="container">
+    <!-- Demo items will be generated here -->
+</div>
+
+<script>
+class DeformationDemo {
+    constructor(container, title, description, deformationFunction) {
+        this.title = title;
+        this.description = description;
+        this.deformationFunction = deformationFunction;
+        
+        // Create DOM elements
+        this.element = document.createElement('div');
+        this.element.className = 'demo-item';
+        
+        this.canvas = document.createElement('canvas');
+        this.canvas.className = 'demo-canvas';
+        
+        this.info = document.createElement('div');
+        this.info.className = 'demo-info';
+        this.info.innerHTML = `<h3>${title}</h3><p>${description}</p>`;
+        
+        this.element.appendChild(this.canvas);
+        this.element.appendChild(this.info);
+        container.appendChild(this.element);
+        
+        // Setup Three.js
+        this.setupThreeJS();
+        this.createSphere();
+        this.animate();
+        
+        this.isAnimating = false;
+        this.time = 0;
+    }
+    
+    setupThreeJS() {
+        const rect = this.canvas.getBoundingClientRect();
+        
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(75, rect.width / rect.height, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+        this.renderer.setSize(rect.width, rect.height);
+        this.renderer.setClearColor(0xf8f8f8);
+        
+        this.camera.position.set(0, 0, 10); // 回到正面视角，距离稍远一点
+        // 移除 lookAt，使用默认朝向
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        this.scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        this.scene.add(directionalLight);
+    }
+    
+    createSphere() {
+        const points = this.generateCubePoints(5000); // 更名为generateCubePoints
+        
+        // Store original positions
+        this.originalPositions = new Float32Array(points.length);
+        for (let i = 0; i < points.length; i++) {
+            this.originalPositions[i] = points[i];
+        }
+        
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(points, 3));
+        
+        const material = new THREE.PointsMaterial({
+            color: 0x333333,
+            size: 0.02,
+            sizeAttenuation: true
+        });
+        
+        this.pointCloud = new THREE.Points(geometry, material);
+        this.scene.add(this.pointCloud);
+    }
+    
+    generateCubePoints(count) {
+        const points = [];
+        const size = 3; // 从2增加到3，立方体更大
+        
+        for (let i = 0; i < count; i++) {
+            // 生成立方体表面的均匀点分布
+            const face = Math.floor(Math.random() * 6); // 6个面
+            const u = (Math.random() - 0.5) * size;
+            const v = (Math.random() - 0.5) * size;
+            
+            let x, y, z;
+            
+            switch(face) {
+                case 0: // 前面 (z = size/2)
+                    x = u; y = v; z = size/2;
+                    break;
+                case 1: // 后面 (z = -size/2)
+                    x = u; y = v; z = -size/2;
+                    break;
+                case 2: // 右面 (x = size/2)
+                    x = size/2; y = u; z = v;
+                    break;
+                case 3: // 左面 (x = -size/2)
+                    x = -size/2; y = u; z = v;
+                    break;
+                case 4: // 上面 (y = size/2)
+                    x = u; y = size/2; z = v;
+                    break;
+                case 5: // 下面 (y = -size/2)
+                    x = u; y = -size/2; z = v;
+                    break;
+            }
+            
+            points.push(x, y, z);
+        }
+        
+        return new Float32Array(points);
+    }
+    
+    startAnimation() {
+        this.isAnimating = true;
+        this.time = 0;
+        this.fadeInTime = 0; // 新增渐入时间
+    }
+    
+    stopAnimation() {
+        this.isAnimating = false;
+        this.fadeInTime = 0; // 重置渐入时间
+        this.resetPositions();
+    }
+    
+    resetPositions() {
+        const positions = this.pointCloud.geometry.attributes.position.array;
+        for (let i = 0; i < positions.length; i++) {
+            positions[i] = this.originalPositions[i];
+        }
+        this.pointCloud.geometry.attributes.position.needsUpdate = true;
+    }
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        if (this.isAnimating) {
+            this.time += 0.004; // Much slower animation
+            this.fadeInTime += 0.008; // 渐入时间增长更快
+            this.applyDeformation();
+        }
+        
+        this.pointCloud.rotation.y += 0.0002;
+        this.renderer.render(this.scene, this.camera);
+    }
+    
+    applyDeformation() {
+        const positions = this.pointCloud.geometry.attributes.position.array;
+        const originalPositions = this.originalPositions;
+        
+        // 渐入系数：前5秒从0渐变到1
+        const fadeInFactor = Math.min(this.fadeInTime / 5.0, 1.0);
+        const smoothFadeIn = fadeInFactor * fadeInFactor * (3 - 2 * fadeInFactor); // 平滑插值
+        
+        for (let i = 0; i < positions.length; i += 3) {
+            const originalPos = {
+                x: originalPositions[i],
+                y: originalPositions[i + 1],
+                z: originalPositions[i + 2]
+            };
+            
+            const deformedPos = this.deformationFunction(originalPos, this.time);
+            
+            // 在原始位置和变形位置之间插值
+            positions[i] = originalPos.x + (deformedPos.x - originalPos.x) * smoothFadeIn;
+            positions[i + 1] = originalPos.y + (deformedPos.y - originalPos.y) * smoothFadeIn;
+            positions[i + 2] = originalPos.z + (deformedPos.z - originalPos.z) * smoothFadeIn;
+        }
+        
+        this.pointCloud.geometry.attributes.position.needsUpdate = true;
+    }
+}
+
+// Deformation functions
+const deformations = [
+    {
+        title: "s1: enter - Expansion",
+        description: "Uniform radial scaling + rotation",
+        func: (pos, t) => {
+            const scale = 1 + (Math.sin(t * 1) + 1) * 0.25; // 从1到1.5循环
+            const angle = t * 0.3;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            
+            return {
+                x: (pos.x * cosA - pos.z * sinA) * scale,
+                y: pos.y * scale,
+                z: (pos.x * sinA + pos.z * cosA) * scale
+            };
+        }
+    },
+    {
+        title: "s2: observe - Undulation",
+        description: "Multi-layer noise surface perturbation",
+        func: (pos, t) => {
+            const noise1 = Math.sin(pos.x * 2 + t * 1.5) * Math.cos(pos.y * 2 + t * 1); // 频率从5减到2
+            const noise2 = Math.sin(pos.z * 3 + t * 2) * 0.3; // 频率从10减到3
+            const intensity = 0.5;
+            
+            return {
+                x: pos.x + noise1 * intensity,
+                y: pos.y + noise2 * intensity,
+                z: pos.z + (noise1 + noise2) * intensity
+            };
+        }
+    },
+    {
+        title: "s3: explain - Elongation",
+        description: "Y-axis stretch + XZ compression",
+        func: (pos, t) => {
+            const stretchFactor = 1 + (Math.sin(t * 0.8) + 1) * 1.5; // 从1到4循环，更明显
+            const compressFactor = 1 - (Math.sin(t * 0.8) + 1) * 0.25; // 从0.5到1循环，更明显
+            const wave = Math.sin(pos.z * 3 + t * 0.5) * 0.1;
+            
+            return {
+                x: pos.x * compressFactor + wave,
+                y: pos.y * stretchFactor,
+                z: pos.z * compressFactor + Math.cos(pos.x * 3 + t * 0.5) * 0.1
+            };
+        }
+    },
+    {
+        title: "s4: honour - Toroidal",
+        description: "Ring deformation",
+        func: (pos, t) => {
+            const radialDist = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+            const targetRadius = 1.5 + Math.sin(t * 2) * 0.5;
+            
+            if (radialDist > 0.01) {
+                const factor = targetRadius / radialDist;
+                return {
+                    x: pos.x * factor,
+                    y: pos.y + Math.sin(radialDist * 4 + t * 3) * 0.2,
+                    z: pos.z * factor
+                };
+            }
+            return { x: targetRadius, y: pos.y, z: 0 };
+        }
+    },
+    {
+        title: "s5: handle - Twist-grip",
+        description: "Y-axis torsion + compression",
+        func: (pos, t) => {
+            const twistAngle = pos.y * (Math.sin(t * 0.8) + 1) * 2; // 从0到4的扭曲
+            const squeeze = 1 - (Math.sin(t * 1.2) + 1) * 0.2; // 从0.6到1循环
+            const cosT = Math.cos(twistAngle);
+            const sinT = Math.sin(twistAngle);
+            
+            // 抓握噪声也调整为正值
+            const gripNoise = Math.sin(pos.x * 3 + t * 0.3) * Math.cos(pos.z * 3 + t * 0.4) * 0.2;
+            
+            return {
+                x: (pos.x * cosT - pos.z * sinT) * squeeze + gripNoise,
+                y: pos.y,
+                z: (pos.x * sinT + pos.z * cosT) * squeeze + gripNoise
+            };
+        }
+    },
+    {
+        title: "s6: deny - Flattening",
+        description: "Y compression + XZ expansion",
+        func: (pos, t) => {
+            const compress = 0.55 - (Math.sin(t * 0.6) + 1) * 0.225; // 从0.1到0.55循环
+            const expand = 1 + (Math.sin(t * 0.6) + 1) * 1; // 从1到3循环
+            
+            return {
+                x: pos.x * expand,
+                y: pos.y * compress,
+                z: pos.z * expand
+            };
+        }
+    },
+    {
+        title: "s7: pain - Spike burst",
+        description: "8-directional spikes + explosion",
+        func: (pos, t) => {
+            // 3D球面角度计算
+            const radius = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
+            const theta = Math.atan2(pos.z, pos.x); // 水平角度
+            const phi = Math.acos(pos.y / radius); // 垂直角度
+            
+            // 3D空间的尖刺方向：基于球面坐标
+            const spikeCount = 8;
+            const combinedAngle = theta * 4 + phi * 4; // 混合水平和垂直角度
+            const randomOffset = Math.sin(pos.x * 12.3 + pos.y * 7.8 + pos.z * 9.4) * 0.8;
+            const spikeAngle = combinedAngle + randomOffset;
+            
+            // 尖刺强度判断 - 增强对比度
+            const spikeIntensity = Math.sin(spikeAngle) > (0.2 + Math.sin(t * 0.3) * 0.2) ? 3.0 : 0.1; // 从1.8/0.2改为3.0/0.1
+            const burstFactor = (Math.sin(t * 1.2) + 1) * 0.4 * spikeIntensity; // 从0.25改回0.4
+            
+            // 径向方向
+            const radialDir = {
+                x: pos.x / radius,
+                y: pos.y / radius, 
+                z: pos.z / radius
+            };
+            
+            // 距离中心的权重：越远的点刺得越厉害 - 调整为适应立方体
+            const distanceWeight = (radius - 2.0) / 1.0; // 适应立方体尺寸：内核半径2.0，过渡区1.0
+            const spikeWeight = Math.max(0, Math.min(1, distanceWeight));
+            
+            // 减少核心膨胀，增强外层尖刺
+            const coreExpansion = 1 + burstFactor * 0.2; // 进一步减少核心膨胀
+            const spikeExtension = burstFactor * spikeWeight * 5; // 从3增加到5，尖刺更长
+            
+            const radialNoise = Math.sin(pos.x * 4 + t * 0.8) * Math.cos(pos.y * 4 + t * 1) * 0.1;
+            
+            return {
+                x: pos.x * coreExpansion + radialDir.x * spikeExtension + radialNoise,
+                y: pos.y * coreExpansion + radialDir.y * spikeExtension,
+                z: pos.z * coreExpansion + radialDir.z * spikeExtension + radialNoise
+            };
+        }
+    },
+    {
+        title: "s8: kill - Dissipation",
+        description: "Radial dispersion dissolution",
+        func: (pos, t) => {
+            const dissipate = Math.sin(t * 0.6) * 0.5 + 0.5;
+            const distance = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z);
+            const dispersionStrength = dissipate * (1 + distance * 3);
+            
+            // 更强烈的随机飞散效果
+            const randomX = Math.sin(pos.x * 7 + t * 0.7) * Math.cos(pos.y * 5 + t * 0.3) * 2;
+            const randomY = Math.sin(pos.y * 6 + t * 0.9) * Math.cos(pos.z * 4 + t * 0.5) * 2;
+            const randomZ = Math.sin(pos.z * 8 + t * 0.4) * Math.cos(pos.x * 6 + t * 0.8) * 2;
+            
+            // 基于点的位置生成不同的飞散方向
+            const seed = pos.x + pos.y * 3.14 + pos.z * 2.71;
+            const scatterX = Math.sin(seed * 1.1 + t * 0.3) * dissipate * 3;
+            const scatterY = Math.sin(seed * 2.3 + t * 0.4) * dissipate * 3;
+            const scatterZ = Math.sin(seed * 3.7 + t * 0.2) * dissipate * 3;
+            
+            return {
+                x: pos.x * (1 + dispersionStrength) + randomX * dissipate + scatterX,
+                y: pos.y * (1 + dispersionStrength) + randomY * dissipate + scatterY,
+                z: pos.z * (1 + dispersionStrength) + randomZ * dissipate + scatterZ
+            };
+        }
+    }
+];
+
+// Initialize demos
+const container = document.getElementById('container');
+const demos = [];
+
+deformations.forEach(deform => {
+    const demo = new DeformationDemo(container, deform.title, deform.description, deform.func);
+    demos.push(demo);
+});
+
+// Control functions
+function animateAll() {
+    demos.forEach(demo => demo.startAnimation());
+    document.querySelector('button').classList.add('active');
+}
+
+function resetAll() {
+    demos.forEach(demo => demo.stopAnimation());
+    document.querySelector('button').classList.remove('active');
+}
+
+// Start animation on load
+setTimeout(() => {
+    animateAll();
+}, 1000);
+</script>
+</body>
+</html>
